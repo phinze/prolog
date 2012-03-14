@@ -1,0 +1,120 @@
+
+<!-- saved from url=(0066)http://web.student.tuwien.ac.at/~e0225855/lisprolog/lisprolog.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Lisprolog - Interpreter for a simple Lisp, written in Prolog</title>
+  </head>
+  <body>
+    <br><br>
+    <center><h3>Lisprolog - Interpreter for a simple Lisp</h3></center>
+    <br><br>
+
+    Some online books show how to implement simple "Prolog" engines in
+    Lisp. These engines typically assume a representation of Prolog
+    programs that is convenient from a Lisp perspective, and can't
+    even parse a single proper Prolog term. Instead, they require you
+    to manually translate Prolog programs to Lisp forms that are no
+    longer valid Prolog syntax. With this approach, implementing a
+    simple "Lisp" in Prolog is even easier ("Lisp in Prolog in zero
+    lines"): Manually translate each Lisp function to a Prolog
+    predicate with one additional argument to hold the original
+    function's return value. Done. This is possible since a function
+    is a special case of a relation, and functional programming is a
+    restricted form of logic programming.
+
+    <br><br>
+
+    Here is a bit beyond that: <a href="http://web.student.tuwien.ac.at/~e0225855/lisprolog/lisprolog.pl">lisprolog.pl</a>
+
+    <br><br>
+
+    These 157 lines of Prolog code give you an interpreter for a
+    simple Lisp, <i>including</i> a parser to let you write Lisp code
+    in its natural form. A few example queries and their results:
+    <br><br>
+
+    <b>Append</b>:
+
+    <pre>    ?- run("
+        (defun append (x y)
+          (if x
+              (cons (car x) (append (cdr x) y))
+            y))
+
+        (append '(a b) '(3 4 5))", V).
+
+    %@ V = [append, [a, b, 3, 4, 5]].
+    </pre>
+
+    <br>
+    <b>Fibonacci, naive version:</b>
+
+    <pre>    ?- time(run("
+        (defun fib (n)
+          (if (= 0 n)
+              0
+            (if (= 1 n)
+                1
+              (+ (fib (- n 1)) (fib (- n 2))))))
+        (fib 24)", V)).
+
+    %@ % 14,255,802 inferences, 3.71 CPU in 3.87 seconds (96% CPU, 3842534 Lips)
+    %@ V = [fib, 46368].
+    </pre>
+
+    <br>
+    <b>Fibonacci, accumulating version:</b>
+
+    <pre>    ?- time(run("
+        (defun fib (n)
+          (if (= 0 n) 0 (fib1 0 1 1 n)))
+
+        (defun fib1 (f1 f2 i to)
+          (if (= i to)
+              f2
+            (fib1 f2 (+ f1 f2) (+ i 1) to)))
+
+        (fib 250)", V)).
+
+    %@ % 39,882 inferences, 0.010 CPU in 0.013 seconds (80% CPU, 3988200 Lips)
+    %@ V = [fib, fib1, 7896325826131730509282738943634332893686268675876375].
+    </pre>
+
+    <br>
+    <b>Fibonacci, iterative version:</b>
+
+    <pre>    ?- time(run("
+        (defun fib (n)
+          (setq f (cons 0 1))
+          (setq i 0)
+          (while (&lt; i n)
+            (setq f (cons (cdr f) (+ (car f) (cdr f))))
+            (setq i (+ i 1)))
+          (car f))
+
+        (fib 350)", V)).
+
+    %@ % 34,233 inferences, 0.010 CPU in 0.010 seconds (98% CPU, 3423300 Lips)
+    %@ V = [fib, 6254449428820551641549772190170184190608177514674331726439961915653414425].
+    </pre>
+
+    <br>
+    <b>Higher-order programming and eval:</b>
+
+    <pre>    ?- run("
+        (defun map (f xs)
+          (if xs
+              (cons (eval (list f (car xs))) (map f (cdr xs)))
+            ()))
+
+        (defun plus1 (x) (+ 1 x))
+
+        (map 'plus1 '(1 2 3))", V).
+
+    %@ V = [map, plus1, [2, 3, 4]].
+    </pre>
+    <br>
+    <a href="http://web.student.tuwien.ac.at/~e0225855/index.html">Main page</a>
+    <br><br><br>
+  
+
+</body></html>
