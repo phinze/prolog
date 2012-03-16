@@ -180,36 +180,6 @@
    (= bindings nil) nil
    (empty? goals) (list bindings)
    true (prove (first goals) bindings (rest goals))))
-(defn prove [goal bindings]
-  (mapcat
-   (fn [clause]
-     (let [new-clause (rename-variables clause)]
-       (prove-all (clause-body new-clause)
-                  (unify goal (clause-head new-clause) bindings))))
-   (get-clauses (predicate goal))))
-(defn prove-all
-  "calls prove on every clause with whatever bindings we've got.
-   will return current bindings"
-  [goals bindings]
-  (cond
-   (= bindings nil) nil
-   (empty? goals) (list bindings)
-   true (mapcat
-         (fn [goal1-solution] (prove-all (rest goals) goal1-solution))
-         (prove (first goals) bindings))))
-(comment
-
-
-
-  )
-
-
-
-
-
-
-
-
 
 
 (defn sean-replace [string & replacements]
@@ -274,19 +244,9 @@
 
 
 (defn top-level-prove [goals]
-  (prove-all goals {}))
-
-
-(defn top-level-prove [goals]
   (prove-all `(~@goals (show-prolog-vars ~(variables-in goals))) {})
   (cl-format true "~&No."))
 
-(defn top-level-prove
-  "Prove the goals and print the variables readably"
-  [goals]
-  (show-prolog-solutions
-   (variables-in goals)
-   (prove-all goals {})))
 
 (defn show-prolog-solutions
   "Print the variables in each of the solutions"
@@ -303,13 +263,11 @@
 
 (defn show-prolog-vars
   "Print each variable with its binding"
-  ;[vars bindings other-goals]
-  [vars bindings]
+  [vars bindings other-goals]
   (if (nil? vars)
     (cl-format true "~&Yes")
-    (map #(cl-format true "~&~a = ~a\n" % (subst-bindings bindings %)) vars)))
-
-(comment   (if (continue?)
+    (map #(cl-format true "~&~a = ~a\n" % (subst-bindings bindings %)) vars))
+  (if (continue?)
     nil
     (prove-all other-goals bindings)))
 
@@ -319,13 +277,16 @@
     (dosync   (ref-set *db-predicates*
                        (assoc db command (eval  command))))))
 
-;(deftrace prove [a b] (prove a b))
-;(deftrace prove-all [a b] (prove-all a b))
+
+(comment
+  (deftrace prove [a b c] (prove a b c))
+  (deftrace prove-all [a b] (prove-all a b))
+  )
 
 
 (defn test-prove []
   (clear-db)
-;  (add-builtin 'show-prolog-vars)
+  (add-builtin 'show-prolog-vars)
   (<- (likes Kim Robin))
   (<- (likes Sandy Lee))
   (<- (likes Sandy Kim))
