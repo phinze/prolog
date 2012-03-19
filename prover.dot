@@ -1,0 +1,34 @@
+digraph {
+  "clause a1";
+  "clause a2";
+  "clause a3";
+
+  "clause a1" -> "clause a2";
+  "clause a2" -> "clause a3";
+
+  "clause b1" -> "clause b2";
+
+  "clause c1";
+  "clause c2";
+
+  "clause c1" -> "clause c2";
+
+  "clause d1";
+  "clause d2";
+  "clause d3";
+  "clause d4";
+
+  "clause d1" -> "clause d2";
+  "clause d2" -> "clause d3";
+  "clause d3" -> "clause d4";
+
+  "clause a1" -> "clause b1" [dir=both];
+  "clause a1" -> "clause c1" [dir=both];
+  "clause a1" -> "clause d1" [dir=both];
+  "clause b1" -> "clause c1" [dir=both];
+  "clause b1" -> "clause d1" [dir=both];
+  "clause c1" -> "clause d1" [dir=both];
+
+
+};
+

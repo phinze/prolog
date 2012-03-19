@@ -1,0 +1,30 @@
+digraph {
+  graph [imagescale=height];
+  "(unify x y bindings)" -> "if bindings nil";
+  "(unify x y bindings)" -> "if x = y";
+  "(unify x y bindings)" -> "if x is a var";
+  "(unify x y bindings)" -> "if y is a var";
+  "(unify x y bindings)" -> "if both x and y\nare sequences";
+  "(unify x y bindings)" -> "return nil\nif all previous\nstatements false";
+
+  "if bindings nil" -> "return nil";
+  "if x = y" -> "return bindings\nFunction returns successfully here";
+
+  "if x is a var" -> "(unify-vars x y bindings)" [taillabel = "assume y is val of var x"];
+  "if y is a var" -> "(unify-vars y x bindings)" [taillabel = "assume x is val of var y"];
+
+  "if both x and y\nare sequences" -> "let b=\n(unify (car x) (car y) bindings)";
+  "let b=\n(unify (car x) (car y) bindings)" -> "(unify\n(cdr x)\n(cdr y)\nb)";
+  "let b=\n(unify (car x) (car y) bindings)" -> "(unify x y bindings)";
+  "(unify\n(cdr x)\n(cdr y)\nb)" -> "(unify x y bindings)";
+
+  "(unify-vars x y bindings)" -> "(unify-vars var-name value bindings)";
+  "(unify-vars y x bindings)" -> "(unify-vars var-name value bindings)";
+
+  "(unify-vars var-name value bindings)" -> "Unify the var-name with value by\n possibly extending the bindings";
+  "Unify the var-name with value by\n possibly extending the bindings" -> "Replace var-name or value\n with something from bindings";
+
+  "(unify-vars var-name value bindings)" -> "Return nil if var-name already\n has a value in bindings";
+  "Replace var-name or value\n with something from bindings" -> "(unify x y bindings)";
+};
+
