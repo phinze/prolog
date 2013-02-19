@@ -111,7 +111,6 @@
   ((deref db-predicates) pred))
 
 
-;(comment
 ; this is where we do the logic like from 
 ; http://lib.store.yahoo.net/lib/paulgraham/onlisp.pdf
 (deftrace prove
@@ -150,8 +149,8 @@
            (prove-all
             ; puts clause body at beginning
             (concat (clause-body new-clause) other-goals) ; goals
-            (unify goal (clause-head new-clause)  bindings)))) ;bindings
-       (get-clauses (predicate goal))) ; gets clauses from db
+            (unify goal (clause-head new-clause) bindings)))) ;bindings
+       clauses)
 
       ;; the predicate's clauses can be an atom:
       ;; a primitive function to be called
@@ -167,7 +166,7 @@
    (= bindings nil) nil
    (empty? goals) (list bindings)
    true (prove (first goals) bindings (rest goals))))
-;)
+
 
 
 
