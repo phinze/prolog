@@ -1,144 +1,37 @@
 (ns prolog.core)
+
+(use 'prolog.unify)
 (use 'clojure.set)
 (use 'clojure.walk)
 (use 'clojure.pprint)
 (use 'clojure.tools.trace)
 
 
-(declare unify unify-variables occurs-check reuse-cons subst-bindings consp unifier prove prove-all maphash clause-body clause-head get-clauses rename-variables variables-in unique-find-anywhere-if ?- show-prolog-solutions show-prolog-vars top-level-prove variable? continue?)
+(declare prove prove-all maphash clause-body clause-head get-clauses 
+         rename-variables ?- show-prolog-solutions 
+         show-prolog-vars top-level-prove continue? add-builtin
+         prolog-equals)
 
 
-(defn != [x y]
-  (not (= x y)))
 
 
-(defn type? [x t]
-  (= (type x) t))
+(defn prolog-print
+  [vars bindings]
+  (println "entering prolog print")
+  ;(println (lookup (first vars) bindings))
+  (dorun (map #(println (lookup % bindings)) vars))
+  ;doall (map #(println (% bindings)) vars))
+  (println "vars are")
+  (doall (map #(println %) vars))
+  (println "bindings are")
+  (doall (map #(println %) bindings))
+  ;(println "other goals are")
+  ;(doall (map #(println %) other-goals))
+  (println "exiting prolog print")
+  ;(prove-all other-goals bindings)
+  )
 
 
-(defn consp [x]
-  (cond
-   (= x '()) false
-   (coll? x) true
-   (type? x clojure.lang.Cons) true
-   true false))
-
-
-(defn cdr [x]jj
-  (if (type? x clojure.lang.PersistentVector)
-    (cond
-     (= (count x) 0) nil
-     (= (count x) 1) nil
-     (= (count x) 2) (first (rest x))
-     true (vec (rest x)))
-    (if (empty? x)
-      nil
-      (rest x))))
-
-
-; expects predicates & number of both arguments to be the same
-(defn unify [x y bindings]
-  (cond
-   (nil? bindings) nil ; an assertion to prevent the prover from
-                       ; putting in nil bindings. don't know why it
-                       ; does this sometimes.
-   (= x y) bindings ; the closing statement. the function ends at this line
-   (variable? x) (unify-variables x y bindings)
-   (variable? y) (unify-variables y x bindings)
-   (and
-    (consp x)
-    (consp y)) (unify (cdr x) (cdr y)
-                      (unify (first x) (first y) bindings))
-   true nil)) ; function will fail if it reaches this point
-
-
-(defn unify-variables [v x bindings] ; v is var name, x is value
-  (cond
-                                        ; called from variable? lines
-                                        ; in unify
-   (v bindings) (unify (v bindings) x bindings)
-   (and
-    (variable? x)
-    (x bindings)) (unify v (x bindings) bindings)
-   (occurs-check v x bindings) nil
-   true (assoc bindings v x)))
-
-
-(defn occurs-check [var x bindings]
-  "if "
-  (cond (= var x) true
-        (and
-          (variable? x)
-          (x bindings)) (occurs-check var (x bindings) bindings)
-        (consp x) (or
-                    (occurs-check var (first x) bindings)
-                    (occurs-check var (cdr x) bindings))
-        true nil))
-
-
-(defmacro xor
-  "Evaluates exprs one at a time, from left to right.  If only one form returns
-  a logical true value (neither nil nor false), returns true.  If more than one
-  value returns logical true or no value returns logical true, retuns a logical
-  false value.  As soon as two logically true forms are encountered, no
-  remaining expression is evaluated.  (xor) returns nil."
-  ([] nil)
-  ([f & r]
-     `(loop [t# false f# '[~f ~@r]]
-        (if-not (seq f#) t#
-                (let [fv# (eval (first f#))]
-                  (cond
-                   (and t# fv#) false
-                   (and (not t#) fv#) (recur true (rest f#))
-                   :else (recur t# (rest f#))))))))
-
-
-(defn blank? [x]
-  (or
-   (nil? x)
-   (and
-    (coll? x)
-    (empty? x))))
-
-
-(defn !blank? [x]
-  (not (blank? x)))
-
-
-(defn sean-cons [x y]
-  (cond
-   (and
-    (blank? y)
-    (!blank? x)) (list x)
-   (not (consp y))
-   (cons x (list y))
-   true (cons x y)))
-
-
-(defn subst-bindings [bindings x]
-  ;(assert (not (nil? x)))
-  (cond
-   (= bindings nil) nil
-   (= bindings {}) x
-   (and
-     (variable? x)
-     (x bindings)) (subst-bindings bindings (x bindings))
-   (not (consp x)) x
-   true (sean-cons
-         (subst-bindings bindings (first x))
-         (subst-bindings bindings (cdr x)))))
-
-
-(defn unifier [x y]
-  (subst-bindings (unify x y {}) x))
-
-
-(defn match-variable [v input bindings] ; v is the var name
-  (let [binding (v bindings)]
-    (cond
-     (not binding) (assoc bindings v input)
-     (= input binding) bindings
-     true nil)))
 
 
 ; some helper functions
@@ -147,9 +40,7 @@
 (defn predicate [relation] (first relation))
 
 
-(def *db-predicates* (ref {}))
-
-
+(def db-predicates (ref {}))
 
 
 (defn in?
@@ -163,18 +54,16 @@
 
 (defn add-clause [clause]
   (let [pred (predicate  (clause-head clause))
-        db   (deref *db-predicates*)]
+        db   (deref db-predicates)]
     (assert (not (variable? pred)))
     (dosync
-     (if (not-in?  pred (deref *db-predicates*))
-       (ref-set *db-predicates*
+     (if (not-in?  pred (deref db-predicates))
+       (ref-set db-predicates
                 (assoc db pred '())))
-     (ref-set *db-predicates*
-              (assoc db pred (cons clause (pred db)))))
+     (ref-set db-predicates
+              (assoc db pred (sean-cons clause (pred db))))) ; second usage of cons
     pred))
 
-
-(defn not-empty? [x] (not (empty? x)))
 
 
 (defn maphash
@@ -183,30 +72,57 @@
   [pred h]
   (loop [k (keys h)
          b {}]
-    (if (not-empty k)
+    (if (!empty? k)
       (recur (rest k) (assoc b (first k) (pred (first k) (h (first k)))))
       b)))
 
 
+(defn add-builtin [command]
+  (let [db (deref db-predicates)]
+    (dosync   (ref-set db-predicates
+                       ;(assoc db command (eval  command))))))
+                        (assoc db command (load-string (str "prolog.core/" command)))))))
+
+(defn add-builtin [command]
+  (let [db (deref db-predicates)]
+    (dosync   (ref-set db-predicates
+                       (assoc db command (eval  command))))))
+
+
+;(load-string (str "prolog.core/" "prolog-print"))
+(defn add-builtin [command expression]
+  (let [db (deref db-predicates)]
+    (dosync   (ref-set db-predicates
+                       (assoc db command (eval (load-string (str "prolog.core/" expression))))))))
+
+
+
 (defn clear-db []
   (dosync
-   (ref-set *db-predicates* (maphash (fn [x y] nil) (deref *db-predicates*))))
-  (add-builtin 'prolog.core/show-prolog-vars)
-  (add-builtin 'prolog.core/prolog-print))
+   (ref-set db-predicates {}))
+  (add-builtin :show-vars 'show-prolog-vars)
+  ;(add-builtin 'prolog-print)
+  ;(add-builtin 'prolog-equals)
+  )
 
 
 (defn get-clauses [pred]
   "gets a list of clauses from database"
-  (pred (deref *db-predicates*)))
+  ((deref db-predicates) pred))
 
 
-(defn prove
+;(comment
+; this is where we do the logic like from 
+; http://lib.store.yahoo.net/lib/paulgraham/onlisp.pdf
+(deftrace prove
   "return a list of possible solutions to a goal
   change mapcat to map to see call structure"
   [goal bindings other-goals] ; goal is always one clause in single
                                         ; parenthesis
+  ;(println (get-clauses (predicate goal)))
   (let [clauses (get-clauses (predicate goal))] ; referenced only if
-                                        ; clauses is a builtin predicate
+                                        ; clauses is a builtin predicate, which means the clauses from the database for something like :show returned something like prolog.core/show-prolog-vars
+    
     (if (consp clauses)
       (some
        (fn [clause] ; for every single clause from get-clauses, attempt
@@ -230,11 +146,11 @@
                                         ; another clause, can still be
                                         ; unified with the head clause
                                         ; of yet another clause
-         (let [new-clause (rename-variables clause)]
+         (let [new-clause (rename-variables clause)] ; each clause is a group of terms in parenthesis
            (prove-all
-            (concat (clause-body new-clause) other-goals) ; puts
-                                        ; clause body at beginning
-            (unify goal (clause-head new-clause)  bindings))))
+            ; puts clause body at beginning
+            (concat (clause-body new-clause) other-goals) ; goals
+            (unify goal (clause-head new-clause)  bindings)))) ;bindings
        (get-clauses (predicate goal))) ; gets clauses from db
 
       ;; the predicate's clauses can be an atom:
@@ -242,7 +158,8 @@
       (clauses (rest goal) bindings other-goals))))
 
 
-(defn prove-all
+; this is the entry point
+(deftrace prove-all
   "calls prove on every clause with whatever bindings we've got.
    will return current bindings"
   [goals bindings]
@@ -250,17 +167,53 @@
    (= bindings nil) nil
    (empty? goals) (list bindings)
    true (prove (first goals) bindings (rest goals))))
+;)
+
+
+
+(comment
+(deftrace prove [goal bindings]
+  ;(println "Calling prove from" called-from)
+  ;(println "entering prove")
+  ;(println "Goals" goal)
+  ;(println "Bindings" bindings)
+  ;(if (consp (get-clauses (predicate goal))) (println "the clauses are---------------" (clause-head (first (get-clauses (predicate goal))))))
+  (let [clauses (get-clauses (predicate goal))] 
+    (if (consp clauses) 
+  		(some (fn [clause] (let [new-clause (rename-variables clause)]
+            (prove-all (clause-body new-clause)
+                       (unify goal (clause-head new-clause) bindings))))
+        (get-clauses (predicate goal)))
+      (clauses (rest goal) bindings))))
+
+
+; this is the entry point
+(deftrace prove-all [goals bindings]
+  ;(println "Calling prove-all from" called-from)
+  ;(println "Entering prove-all")
+  ;(println "Goals" goals)
+  ;(println "Bindings" bindings)
+  (cond
+   (= bindings nil) nil
+   (empty? goals) (list bindings)
+   true (some (fn [goal1-solution] (prove-all (rest goals) goal1-solution))
+              (prove (first goals) bindings))))
+)
 
 
 (defn sean-replace [string & replacements]
  (loop [p replacements
         s string]
-   (if (not-empty p)
+   (if (!empty? p)
      (recur
        (-> p rest rest)
        (.replace s (first p) (second p)))
      s)))
 
+(def i (ref 0))
+(defn get-next-sym [] 
+  (dosync (ref-set i (+ (deref i) 1)))
+  (str (deref i)))
 (defn rename-variables
   "replace all variables in x with new ones"
   [x]
@@ -272,38 +225,13 @@
               (str
                "?"
                (sean-replace (str x) "?" "")
-               (gensym))))
+               (get-next-sym))))
          (variables-in x)))
    x))
 
 
-(defn variable? [x]
-  (if
-      (and
-       (symbol? x)
-       (!= (.indexOf (str x) "?") -1))
-    true nil))
 
 
-(defn variables-in
-  "return a list of all the variables in expression"
-  [exp]
-  (unique-find-anywhere-if #'variable? exp))
-
-
-(defn unique-find-anywhere-if
-  "return a list of leaves of tree satisfying predicate
-  with duplicates removed
-  found-so-far needs to be by default a null set (set '())"
-  [predicate tree]
-  (filter
-   predicate
-   (set
-    (filter #(!= % 'quote) (flatten tree)))))
-
-
-(defmacro ?- [& goals]
-  `(prove-all '~goals {}))
 
 
 (defmacro ?- [& goals]
@@ -311,27 +239,6 @@
 
 (defmacro <- [& clause]
   `(add-clause '~clause))
-
-
-(defn top-level-prove [goals]
-  (prove-all `(~@goals (show-prolog-vars ~@(variables-in goals))) {}))
-
-
-(defn show-prolog-solutions
-  "Print the variables in each of the solutions"
-  [vars solutions]
-  (if (nil? solutions)
-    (cl-format true "~&No\n")
-    (map #(show-prolog-vars vars %) solutions)))
-
-
-(defn continue?
-  "@TODO ask user if we should stop"
-  [] true)
-
-
-(comment
-   (doall (map #(cl-format true "~&~a = ~a\n" % (subst-bindings bindings %)) vars)))
 
 
 (defn show-prolog-vars
@@ -352,17 +259,21 @@
     nil
     (prove-all other-goals bindings)))
 
-
-(defn add-builtin [command]
-  (let [db (deref *db-predicates*)]
-    (dosync   (ref-set *db-predicates*
-                       (assoc db command (eval  command))))))
+(defn top-level-prove [goals]
+  (prove-all `(~@goals (:show-vars ~@(variables-in goals))) {}))
 
 
-(defn prolog-print
+
+(defn continue?
+  "@TODO ask user if we should stop"
+  [] true)
+
+
+(defn prolog-assert
   [vars bindings other-goals]
-  (doall (map #(println %) vars))
   (prove-all other-goals bindings))
+
+
 
 
 ;(deftrace prove-all [a b] (prove-all a b))
@@ -378,7 +289,8 @@
   (<- (likes Sandy ?x) (likes ?x cats))
   (<- (likes Kim ?x) (likes ?x Lee) (likes ?x Kim))
   (<- (likes ?x ?x))
-  (?- (likes Sandy ?who)))
+  (?- (likes Sandy ?who))
+  (println "done."))
 
 
 (defn test-append []
@@ -393,10 +305,14 @@
   (clear-db)
   (<- (member ?x [?x ?rest]))
   (<- (member ?x [? ?rest]) (member ?x ?rest))
-  (?- (member a (a b)) (prolog.core/prolog-print true)))
+  (?- (member a (a b)) (prolog-print true)))
 
 
 (defn test-lisp []
   (clear-db)
   (<- (eval-all [] []) (eval-all []))
-  (?- (eval-all () ()) (prolog.core/prolog-print true)))
+  (?- (eval-all () ()) (prolog-print true)))
+
+(defn -main [& args]
+  (println (test-prove)))
+
