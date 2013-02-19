@@ -165,7 +165,28 @@
   (cond
    (= bindings nil) nil
    (empty? goals) (list bindings)
-   true (prove (first goals) bindings (rest goals))))
+   true ; to simulate default and statement, just use (prove (first goals) bindings (rest goals)) instead of garbage below
+          (let [pred (predicate (first goals))]
+            ;(println (= pred :and))
+            (cond (= pred :and) ;(prove (first goals) bindings (rest goals))
+                  (let [clauses (rest (first goals))]
+                    (println "and statement reached" clauses)
+                    (println "clauses was" clauses)
+                    (println "(first goals) was" (first goals))
+                    (println "(first clauses) was" (first clauses))
+                    (println "(rest goals) was" (rest goals))
+                    (println "(rest clauses) was" (rest clauses))
+										(println "new goal thing is" (into (rest goals) (rest clauses)))
+                    ; this worked.
+                    ;(prove (first clauses) bindings (into (rest goals) (rest clauses))) ; into puts every element in (rest clauses) into start of list
+                    ; but this works better
+                    ; process clauses here before you call prove. once you call prove you can't process or, and or not statements anymore
+                    (prove-all (into (rest goals) clauses) bindings) ; into puts every element in (rest clauses) into start of list
+                    )
+                  (= pred :or) (prove (first goals) bindings (rest goals)) ; now for the or statement, we want to do some conditional branching.
+                  ; that means calling prove-all on several clauses
+                  true (prove (first goals) bindings (rest goals))
+                  ))))
 
 
 
