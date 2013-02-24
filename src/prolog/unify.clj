@@ -150,7 +150,7 @@
                       (unify (first x) (first y) bindings))
    true nil)) ; function will fail if it reaches this point
 
-; what does this do too?
+; todo more docs but, this won't be focus of talk
 (defn unify-variables [v x bindings] ; v is var name, x is value
   (cond
                                         ; called from variable? lines
@@ -163,7 +163,7 @@
    ; don't worry about the  (and *occurs-check* (occurs-check var x bindings)) fail, thing
    true (assoc bindings v x)))
 
-; what do this do again?
+; todo more docs
 (defn occurs-check [var x bindings]
   (cond (= var x) true
         (and

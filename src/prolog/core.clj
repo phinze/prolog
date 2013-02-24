@@ -14,15 +14,66 @@
          prolog-is)
 
 
-(defn prolog-cut [vars bindings other-goals]
-  (println "CUT!")
+(defn show-prolog-vars
+  "Print each variable with its binding"
+  [vars bindings other-goals]
+  ;(println bindings)
+  (if (nil? vars)
+    (cl-format true "~&Yes")
+    (loop [vars vars
+           v (first vars)]
+      (if (not (nil? v))
+        (cl-format true "~&~a = ~a\n" v (subst-bindings bindings v)))
+      (if (not (nil? v))
+        (recur
+         (rest vars)
+         (first (rest  vars))))))
+  
+;  (if (continue?)
+;    nil
+;    )
+  (prove-all other-goals bindings)
+  )
+
+
+(defn prolog-fail [vars bindings other-goals]
+  (println "failure")
   nil)
+
+
+(defn prolog-equals [vars bindings other-goals]
+  ;(println (first vars))
+  ;(println (subst-bindings bindings (first vars)))
+  ;(println (second vars))
+  ;(println (subst-bindings bindings (second vars)))
+  (let [x (subst-bindings bindings (first vars))
+        y (subst-bindings bindings (second vars))]
+		;(println "x is" x)
+		;(println "y is" y)
+    (if (= x y)
+      (prove-all other-goals bindings)
+      nil)))
+
+(defn prolog-add [vars bindings other-goals]
+  ;(println (first vars))
+  ;(println (subst-bindings bindings (first vars)))
+  ;(println (second vars))
+  ;(println (subst-bindings bindings (second vars)))
+  (let [x (subst-bindings bindings (first vars))
+        y (subst-bindings bindings (second vars))]
+		;(println "x is" x)
+		;(println "y is" y)
+    (if (= x y)
+      (prove-all other-goals bindings)
+      nil)))
+
+
 
 (defn prolog-is [vars bindings other-goals]
   (println "vars are")
   (doall (map #(println %) vars))
-  
   (prove-all other-goals bindings))
+
 
 (defn prolog-print
   [vars bindings other-goals]
@@ -37,7 +88,6 @@
   ;(println "other goals are")
   ;(doall (map #(println %) other-goals))
   ;(println "exiting prolog print")
-  
   (prove-all other-goals bindings)
   )
 
@@ -100,7 +150,9 @@
   (add-builtin :show-vars 'show-prolog-vars)
   (add-builtin :print 'prolog-print)
   (add-builtin :is 'prolog-is)
-  (add-builtin :cut 'prolog-cut)
+  (add-builtin :fail 'prolog-fail)
+  (add-builtin := 'prolog-equals)
+  (add-builtin :+ 'prolog-add)
 
   ;(add-builtin 'prolog-equals)
   )
@@ -129,6 +181,8 @@
   ; remember, when you're getting new clauses, your getting new clauses based on the predicate of the goal
   ; so for any () with likes in the front, it's gonna get this from the db:
   ; db-predicates => #<Ref@18598b6: {likes (((likes Sandy ?x) (:or (likes ?x cats) (likes ?x Lee))) ((likes Robin cats))), :show-vars #<core$show_prolog_vars prolog.core$show_prolog_vars@19cb8>}>
+  (println (predicate goal))
+  (println (get-clauses (predicate goal))
   (let [clauses (get-clauses (predicate goal))] ; referenced only if
                                         ; clauses is a builtin predicate, which means the clauses from the database for something like :show returned something like prolog.core/show-prolog-vars
     ;(println "clauses from pred" clauses)
@@ -188,7 +242,9 @@
 
       ;; the predicate's clauses can be an atom:
       ;; a primitive function to be called
-      (clauses (rest goal) bindings other-goals)))) ; arithmetic
+      
+      (clauses (rest goal) bindings other-goals)
+      ))) ; arithmetic
 
 
 ; this is the entry/exit point
@@ -315,23 +371,7 @@
   `(add-clause '~clause))
 
 
-(defn show-prolog-vars
-  "Print each variable with its binding"
-  [vars bindings other-goals]
-  ;(println bindings)
-  (if (nil? vars)
-    (cl-format true "~&Yes")
-    (loop [vars vars
-           v (first vars)]
-      (if (not (nil? v))
-        (cl-format true "~&~a = ~a\n" v (subst-bindings bindings v)))
-      (if (not (nil? v))
-        (recur
-         (rest vars)
-         (first (rest  vars))))))
-  (if (continue?)
-    nil
-    (prove-all other-goals bindings)))
+
 
 
 (defn top-level-prove [goals]
