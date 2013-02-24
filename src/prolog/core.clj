@@ -13,22 +13,24 @@
          prolog-equals)
 
 
-
+(defn prolog-set [vars bindings other-goals]
+  (prove-all other-goals bindings))
 
 (defn prolog-print
-  [vars bindings]
+  [vars bindings other-goals]
   (println "entering prolog print")
   ;(println (lookup (first vars) bindings))
   (dorun (map #(println (lookup % bindings)) vars))
   ;doall (map #(println (% bindings)) vars))
-  (println "vars are")
-  (doall (map #(println %) vars))
-  (println "bindings are")
-  (doall (map #(println %) bindings))
+  ;(println "vars are")
+  ;(doall (map #(println %) vars))
+  ;(println "bindings are")
+  ;(doall (map #(println %) bindings))
   ;(println "other goals are")
   ;(doall (map #(println %) other-goals))
-  (println "exiting prolog print")
-  ;(prove-all other-goals bindings)
+  ;(println "exiting prolog print")
+  
+  (prove-all other-goals bindings)
   )
 
 
@@ -101,7 +103,7 @@
   (dosync
    (ref-set db-predicates {}))
   (add-builtin :show-vars 'show-prolog-vars)
-  ;(add-builtin 'prolog-print)
+  (add-builtin :print 'prolog-print)
   ;(add-builtin 'prolog-equals)
   )
 
@@ -113,17 +115,47 @@
 
 ; this is where we do the logic like from 
 ; http://lib.store.yahoo.net/lib/paulgraham/onlisp.pdf
+; remember, prove can call prove-all multiple times
+; and prove-all can call prove multiple times
+; prove-all can call prove-all 
+; prove cannot call prove
+
+; both prove-all and prove can return nil
+; only prove-all can return bindings
+; prove returns nil if no head clauses can unify with the goal
 (deftrace prove
   "return a list of possible solutions to a goal
   change mapcat to map to see call structure"
   [goal bindings other-goals] ; goal is always one clause in single
                                         ; parenthesis
-  ;(println (get-clauses (predicate goal)))
+  ; remember, when you're getting new clauses, your getting new clauses based on the predicate of the goal
+  ; so for any () with likes in the front, it's gonna get this from the db:
+  ; db-predicates => #<Ref@18598b6: {likes (((likes Sandy ?x) (:or (likes ?x cats) (likes ?x Lee))) ((likes Robin cats))), :show-vars #<core$show_prolog_vars prolog.core$show_prolog_vars@19cb8>}>
   (let [clauses (get-clauses (predicate goal))] ; referenced only if
                                         ; clauses is a builtin predicate, which means the clauses from the database for something like :show returned something like prolog.core/show-prolog-vars
-    
-    (if (consp clauses)
-      (some
+    ;(println "clauses from pred" clauses)
+    (if (consp clauses) ; we call consp clauses because sometimes the clauses variable is a function which we can call to do an operation
+      ; like arithmetic or printing to O
+      
+      ; this is the old version from peter norvig
+        
+      (some ; why do we call some?? some think that's a very good question
+       ; we call some because some returns the first value that is non-nil
+       ; we could also just call prove-all on the first head-clause that unifies with goal (first param)
+       
+       ; actually, the thing is, we have to call prove-all even if the bindings are nil.
+       ; why is this?
+       
+       ;-------------------------
+       ;clojure.core/some
+       ;([pred coll])
+       ;Returns the first logical true value of (pred x) for any x in coll,
+       ;else nil.  One common idiom is to use a set as pred, for example
+       ;this will return :fred if :fred is in the sequence, otherwise nil:
+       ;(some #{:fred} coll)
+       ;(some #(if (even? %) %) [1 2 3 4]) => 2
+       
+       
        (fn [clause] ; for every single clause from get-clauses, attempt
                                         ; to unify with head clause
                                         ; if it unifies, prove will be
@@ -146,44 +178,72 @@
                                         ; unified with the head clause
                                         ; of yet another clause
          (let [new-clause (rename-variables clause)] ; each clause is a group of terms in parenthesis
-           (prove-all
+          (prove-all
             ; puts clause body at beginning
             (concat (clause-body new-clause) other-goals) ; goals
-            (unify goal (clause-head new-clause) bindings)))) ;bindings
+            (unify goal (clause-head new-clause) bindings)))) ; this is like only calling prove-all if the goal unifies with the head clause
+       																												; unify will return nil if these two clauses don't unify
+       																												; and prove-all returns nil if the bindings param is nil
+       ; TODO: this would be much simpler if we didn't call prove-all if the bindings param was nil
+       
        clauses)
 
       ;; the predicate's clauses can be an atom:
       ;; a primitive function to be called
-      (clauses (rest goal) bindings other-goals))))
+      (clauses (rest goal) bindings other-goals)))) ; arithmetic
 
 
-; this is the entry point
+; this is the entry/exit point
+; prove-all is called first and it is what returns the bindings
+; whenever you see prove-all have nil as the second parameter means that prove wasn't able to unify something
+; clauses can unify or not unify based on the bindings variable
+; what unified before may not unify later depending on the bindings for the variables.
+; this is how we don't go into infinite recursion (usually)
 (deftrace prove-all
   "calls prove on every clause with whatever bindings we've got.
    will return current bindings"
   [goals bindings]
   (cond
-   (= bindings nil) nil
-   (empty? goals) (list bindings)
+   (= bindings nil) nil ; this is the failure code, you can do consp on the return code of prove-all to determine if prove-all failed to unify
+   (empty? goals) (list bindings) ; if the return code is a list, then, consp will return true
    true ; to simulate default and statement, just use (prove (first goals) bindings (rest goals)) instead of garbage below
           (let [pred (predicate (first goals))]
             ;(println (= pred :and))
             (cond (= pred :and) ;(prove (first goals) bindings (rest goals))
                   (let [clauses (rest (first goals))]
-                    (println "and statement reached" clauses)
-                    (println "clauses was" clauses)
-                    (println "(first goals) was" (first goals))
-                    (println "(first clauses) was" (first clauses))
-                    (println "(rest goals) was" (rest goals))
-                    (println "(rest clauses) was" (rest clauses))
-										(println "new goal thing is" (into (rest goals) (rest clauses)))
+                    ;(println "and statement reached" clauses)
+                    ;(println "clauses was" clauses)
+                    ;(println "(first goals) was" (first goals))
+                    ;(println "(first clauses) was" (first clauses))
+                    ;(println "(rest goals) was" (rest goals))
+                    ;(println "(rest clauses) was" (rest clauses))
+										;(println "new goal thing is" (into (rest goals) (rest clauses)))
                     ; this worked.
                     ;(prove (first clauses) bindings (into (rest goals) (rest clauses))) ; into puts every element in (rest clauses) into start of list
                     ; but this works better
                     ; process clauses here before you call prove. once you call prove you can't process or, and or not statements anymore
                     (prove-all (into (rest goals) clauses) bindings) ; into puts every element in (rest clauses) into start of list
                     )
-                  (= pred :or) (prove (first goals) bindings (rest goals)) ; now for the or statement, we want to do some conditional branching.
+                  (= pred :or) ; now for the or statement, we want to do some conditional branching.
+                  (let [clauses (rest (first goals))]
+                    ;(println "or statement reached" clauses)
+                    ;(println "clauses was" clauses)
+                    ;(println "(first goals) was" (first goals))
+                    ;(println "(rest goals) was" (rest goals))
+                    ;(println "(first clauses) was" (first clauses))
+                    ;(println "(rest clauses) was" (rest clauses))
+										;(println "new goal thing is" (into (rest goals) (list (first clauses))))
+                    (loop [clauses (rest (first goals))
+                           other-goals (rest goals)]
+                      ;(println "clauses is" clauses)
+                      ;(println "Other goals is" other-goals)
+                      (if (= (count clauses) 0)
+                        nil
+                      	(if (consp (prove-all (into (rest goals) (list (first clauses))) bindings))
+                        	bindings
+                        	(recur (rest clauses) other-goals)))
+                    ;(prove (first goals) bindings (rest goals))                 
+                    ))
                   ; that means calling prove-all on several clauses
                   true (prove (first goals) bindings (rest goals))
                   ))))
@@ -250,10 +310,6 @@
    x))
 
 
-
-
-
-
 (defmacro ?- [& goals]
   `(top-level-prove '~goals))
 
@@ -279,9 +335,9 @@
     nil
     (prove-all other-goals bindings)))
 
+
 (defn top-level-prove [goals]
   (prove-all `(~@goals (:show-vars ~@(variables-in goals))) {}))
-
 
 
 (defn continue?
