@@ -244,7 +244,7 @@
       ;; a primitive function to be called
       
       (clauses (rest goal) bindings other-goals)
-      ))) ; arithmetic
+      )))) ; arithmetic
 
 
 ; this is the entry/exit point
