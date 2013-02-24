@@ -10,10 +10,18 @@
 (declare prove prove-all maphash clause-body clause-head get-clauses 
          rename-variables ?- show-prolog-solutions 
          show-prolog-vars top-level-prove continue? add-builtin
-         prolog-equals)
+         prolog-equals
+         prolog-is)
 
 
-(defn prolog-set [vars bindings other-goals]
+(defn prolog-cut [vars bindings other-goals]
+  (println "CUT!")
+  nil)
+
+(defn prolog-is [vars bindings other-goals]
+  (println "vars are")
+  (doall (map #(println %) vars))
+  
   (prove-all other-goals bindings))
 
 (defn prolog-print
@@ -79,19 +87,6 @@
       b)))
 
 
-(defn add-builtin [command]
-  (let [db (deref db-predicates)]
-    (dosync   (ref-set db-predicates
-                       ;(assoc db command (eval  command))))))
-                        (assoc db command (load-string (str "prolog.core/" command)))))))
-
-(defn add-builtin [command]
-  (let [db (deref db-predicates)]
-    (dosync   (ref-set db-predicates
-                       (assoc db command (eval  command))))))
-
-
-;(load-string (str "prolog.core/" "prolog-print"))
 (defn add-builtin [command expression]
   (let [db (deref db-predicates)]
     (dosync   (ref-set db-predicates
@@ -104,6 +99,9 @@
    (ref-set db-predicates {}))
   (add-builtin :show-vars 'show-prolog-vars)
   (add-builtin :print 'prolog-print)
+  (add-builtin :is 'prolog-is)
+  (add-builtin :cut 'prolog-cut)
+
   ;(add-builtin 'prolog-equals)
   )
 
@@ -123,7 +121,7 @@
 ; both prove-all and prove can return nil
 ; only prove-all can return bindings
 ; prove returns nil if no head clauses can unify with the goal
-(deftrace prove
+(defn prove
   "return a list of possible solutions to a goal
   change mapcat to map to see call structure"
   [goal bindings other-goals] ; goal is always one clause in single
@@ -199,7 +197,7 @@
 ; clauses can unify or not unify based on the bindings variable
 ; what unified before may not unify later depending on the bindings for the variables.
 ; this is how we don't go into infinite recursion (usually)
-(deftrace prove-all
+(defn prove-all
   "calls prove on every clause with whatever bindings we've got.
    will return current bindings"
   [goals bindings]
